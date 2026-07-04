@@ -304,3 +304,66 @@ counts from the last continue.
 
 **Result:** T5 scheduler logic complete + tested. The end-to-end AC5 behaviour (pause playback +
 show the recall overlay + resume on Continue) is wired into the UI in T6/T7.
+
+---
+
+## Session 5 — 2026-07-04 — T6/T7 reading surface + controls (Phase 1 UI)
+
+Wired everything into a real reader: open a PDF, follow along, controls, and the recall overlay.
+
+**Engine addition (R10 base-pace):** `PacingEngine.schedule(..., basePaceOffset = 0)` shifts the
+narration baseline, but the safety **cap stays anchored to the ORIGINAL density baseline**, so the
+Learning cap still wins (AC10). New test `basePaceOffset_liftsRateButCapStillWins`.
+
+**New commonMain UI (Compose):**
+- `ui/Theme.kt` — paper-toned palette.
+- `ui/ReaderState.kt` — state holder coordinating PacingEngine + Player + PdfExtractor +
+  RecallScheduler; observable Compose state (units/steps/activeIndex/playing/section/elapsed/
+  density/mode/basePace/voices/recallDue/error). `PickedPdf(name, bytes)`. Elapsed + recall timing
+  use `kotlin.time.TimeSource.Monotonic` (reading time); a 1 Hz ticker drives `recall.onTick()`.
+- `ui/ReaderScreen.kt` — header (doc name, %, Open), reading surface (`LazyColumn`, active-sentence
+  highlight, auto-scroll, paragraph/section pause markers), plus empty/scanned/error/loading states.
+- `ui/RecallOverlay.kt` — "Rest / what were the key points…" modal, Continue resumes (**AC5** e2e).
+- `ui/EmptyState.kt` — first-run, scanned-PDF message (**AC9** e2e / R12), and error states.
+- `ui/TransportBar.kt` — prev/play-pause/next/section, live wpm + elapsed + section + progress.
+- `ui/ControlRail.kt` — density (AUTO/DENSE/STANDARD/LIGHT), mode (LEARNING/FREE), base-pace slider
+  ("Learning cap active" hint), voice dropdown + preview.
+- `App.kt` — hosts `ReaderScreen`, wires keyboard (space/←/→, **R7**), takes a `pickPdf` callback.
+- `desktopMain/main.kt` — supplies `pickPdf` via an AWT `FileDialog` (shown on the EDT, bytes read
+  on IO); larger default window.
+
+**Fix:** JVM signature clash — `var density` auto-generates `setDensity`, which collided with a
+`fun setDensity`. Renamed the mutators to `selectDensity` / `selectMode` / `nudgeBasePace`.
+
+**Sample doc:** added `samples/cadence-sample.pdf` — a structured 3-section ML primer generated via
+PDFBox (headings at 20pt so section detection + recall actually fire). A first attempt with
+`cupsfilter` produced a uniform-font PDF (SECTION=0), so it was replaced with the PDFBox version;
+the one-shot generator was then removed so the test suite doesn't write repo files.
+
+```bash
+./gradlew :shared:compileKotlinDesktop --console=plain   # fixed setter clash → BUILD SUCCESSFUL
+./gradlew :shared:desktopTest --console=plain            # 40 tests, 0 failures
+./gradlew :shared:run … &                                # full reader UI launches, no exceptions
+grep -rniE 'java\.net|http|URL\(|Socket|okhttp|ktor' shared/src/{commonMain,desktopMain}  # none → AC8 holds
+```
+
+**Result:** T6/T7 complete on desktop. All of Phase 1's logic is built and verified; AC5/AC6/AC7/
+AC8/AC9 covered end-to-end on the desktop target.
+
+**How to try it:** `./gradlew :shared:run` → **Open PDF** → pick `samples/cadence-sample.pdf` (or any
+text PDF) → **Play**. Change Density/Mode/Base-pace/Voice live; after 2 sections the recall overlay
+appears; **Continue** resumes.
+
+### Phase 1 status
+
+| Task | State |
+|---|---|
+| T4 PdfExtractor | ✅ AC1 + AC9 (real PDFs) |
+| T5 RecallScheduler | ✅ 5 tests |
+| T6/T7 Reading UI + controls | ✅ desktop; AC5/6/7 e2e |
+| On-device (AC8) | ✅ no networking in sources |
+| Android/iOS `Speaker`/`PdfExtractor` actuals | ⏳ deferred — needs Android SDK + device/sim |
+| **Phase 1 gate** | **✋ built on desktop; awaiting human feel-check + TestFlight/dmg decision** |
+
+**Next:** Phase 1 remainder needs Android SDK install (+ iOS on device) for the mobile actuals and
+the AVSpeech rate-mapping trap. Then Phase 2 (neural voices, pace ribbon T8, adaptation ramp).

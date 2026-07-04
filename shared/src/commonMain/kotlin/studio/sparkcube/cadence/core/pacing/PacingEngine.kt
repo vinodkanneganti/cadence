@@ -15,12 +15,17 @@ import kotlin.math.roundToInt
  */
 object PacingEngine {
 
-    fun schedule(units: List<Unit>, density: Density, mode: Mode): List<Step> {
+    fun schedule(
+        units: List<Unit>,
+        density: Density,
+        mode: Mode,
+        basePaceOffset: Int = 0,
+    ): List<Step> {
         val preset = resolvePreset(units, density)
         val pauseScale = PacingConstants.PAUSE_SCALE.getValue(mode)
         return units.map { unit ->
             val complexity = complexityOf(unit.text)
-            val wpm = targetWpm(complexity, preset, mode)
+            val wpm = targetWpm(complexity, preset, mode, basePaceOffset)
             val basePause = PacingConstants.PAUSE_MS.getValue(unit.boundary)
             Step(
                 text = unit.text,
@@ -36,13 +41,17 @@ object PacingEngine {
      * Dense units (complexity ≥ 0.5) slow toward `min`; light units rise toward
      * the mode cap. In LEARNING the cap is min(base·1.5, base·capMult).
      */
-    fun targetWpm(complexity: Double, preset: DensityPreset, mode: Mode): Int {
-        val base = preset.base.toDouble()
+    fun targetWpm(complexity: Double, preset: DensityPreset, mode: Mode, basePaceOffset: Int = 0): Int {
+        // The user's base-pace nudge shifts the narration baseline, but the safety
+        // ceiling stays anchored to the ORIGINAL density baseline — so the Learning
+        // cap always wins over user preference (AC10).
+        val origBase = preset.base.toDouble()
+        val base = (preset.base + basePaceOffset).toDouble()
         var cap = when (mode) {
-            Mode.LEARNING -> base * PacingConstants.LEARNING_CAP_MULT
-            Mode.FREE -> base * PacingConstants.FREE_CAP_MULT
+            Mode.LEARNING -> origBase * PacingConstants.LEARNING_CAP_MULT
+            Mode.FREE -> origBase * PacingConstants.FREE_CAP_MULT
         }
-        val learningCap = base * preset.capMult
+        val learningCap = origBase * preset.capMult
         if (mode == Mode.LEARNING) cap = minOf(cap, learningCap)
 
         val wpm = if (complexity >= 0.5) {

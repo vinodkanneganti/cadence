@@ -129,6 +129,19 @@ class PacingEngineTest {
     }
 
     @Test
+    fun basePaceOffset_liftsRateButCapStillWins() {
+        val preset = DENSITY_PRESETS.getValue(Density.STANDARD)
+        // A dense-ish unit read slower; a positive nudge raises it...
+        val slow = PacingEngine.targetWpm(0.6, preset, Mode.LEARNING, basePaceOffset = 0)
+        val nudged = PacingEngine.targetWpm(0.6, preset, Mode.LEARNING, basePaceOffset = 20)
+        assertTrue(nudged > slow, "base-pace nudge should raise a mid-complexity rate")
+
+        // ...but even a huge nudge on the easiest unit cannot pass the Learning cap (225).
+        val maxed = PacingEngine.targetWpm(0.0, preset, Mode.LEARNING, basePaceOffset = 500)
+        assertTrue(maxed <= 225, "cap wins over base-pace, was $maxed")
+    }
+
+    @Test
     fun freeMode_canExceedLearningCap() {
         // Sanity: FREE mode is allowed above the learning ceiling (cap = base·2.0).
         val learning = PacingEngine.schedule(listOf(lightSentence), Density.STANDARD, Mode.LEARNING).single()

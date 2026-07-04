@@ -57,6 +57,7 @@ fun ReaderScreen(state: ReaderState, onOpen: () -> Unit) {
                     MetaBar(state)
                     if (state.pageCount > 1) PageBar(state)
                     state.resumeHint?.let { ResumeBanner(it) }
+                    state.playbackNote?.let { PlaybackBanner(it) }
                     BookmarkBar(state)
                     ReadingSurface(state, Modifier.weight(1f))
                     ControlRail(state)
@@ -137,6 +138,16 @@ private fun ResumeBanner(text: String) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("↻  $text", fontSize = 12.sp, color = CadenceColors.Accent, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun PlaybackBanner(text: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("⚠ $text", fontSize = 12.sp, color = CadenceColors.Error)
     }
 }
 

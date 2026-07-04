@@ -53,7 +53,8 @@ class ReaderState(
     var section by mutableStateOf(0); private set
     var elapsedSeconds by mutableStateOf(0L); private set
     var recallDue by mutableStateOf(false); private set
-    var errorMessage by mutableStateOf<String?>(null); private set
+    var errorMessage by mutableStateOf<String?>(null); private set   // fatal: gates the reader
+    var playbackNote by mutableStateOf<String?>(null); private set   // transient: a small banner
 
     var pageCount by mutableStateOf(0); private set
     var resumeHint by mutableStateOf<String?>(null); private set
@@ -89,7 +90,8 @@ class ReaderState(
         player.onUnitStart = { activeIndex = it }
         player.onSectionBoundary = { n -> section = n; recall.onSectionBoundary() }
         player.onFinished = { playing = false; stopTicker() }
-        player.onError = { msg -> playing = false; errorMessage = msg; stopTicker() }
+        // A speech error must NOT tear down the reader — surface it as a transient note.
+        player.onError = { msg -> playing = false; stopTicker(); playbackNote = msg }
 
         val vs = speaker.voices()
         voices = vs.sortedWith(
@@ -134,7 +136,7 @@ class ReaderState(
         if (player.isPlaying) {
             player.pause(); playing = false; stopTicker(); saveBookmark()
         } else {
-            resumeHint = null
+            resumeHint = null; playbackNote = null
             player.play(); playing = true; startTicker()
         }
     }

@@ -43,6 +43,43 @@ object BookmarkCodec {
     fun upsert(existing: List<Bookmark>, bookmark: Bookmark): List<Bookmark> =
         existing.filterNot { it.docId == bookmark.docId } + bookmark
 
+    // --- User bookmark list ---------------------------------------------------
+
+    fun encodeUser(items: Collection<UserBookmark>): String =
+        items.joinToString("\n") { b ->
+            listOf(
+                esc(b.id),
+                esc(b.docId),
+                b.unitIndex.toString(),
+                b.page.toString(),
+                b.createdAt.toString(),
+                esc(b.label),
+                esc(b.snippet),
+            ).joinToString("\t")
+        }
+
+    fun decodeUser(text: String): List<UserBookmark> =
+        text.lineSequence()
+            .map { it.trimEnd('\r') }
+            .filter { it.isNotBlank() }
+            .mapNotNull { line ->
+                val p = line.split('\t')
+                if (p.size < 7) return@mapNotNull null
+                val unitIndex = p[2].toIntOrNull() ?: return@mapNotNull null
+                val page = p[3].toIntOrNull() ?: return@mapNotNull null
+                val createdAt = p[4].toLongOrNull() ?: return@mapNotNull null
+                UserBookmark(
+                    id = unesc(p[0]),
+                    docId = unesc(p[1]),
+                    unitIndex = unitIndex,
+                    page = page,
+                    createdAt = createdAt,
+                    label = unesc(p[5]),
+                    snippet = unesc(p[6]),
+                )
+            }
+            .toList()
+
     private fun esc(s: String): String =
         s.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
 

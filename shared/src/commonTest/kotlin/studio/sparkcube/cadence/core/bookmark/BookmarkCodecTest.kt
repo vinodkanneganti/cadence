@@ -45,6 +45,25 @@ class BookmarkCodecTest {
     }
 
     @Test
+    fun userBookmarks_roundTripWithSpecialChars() {
+        val items = listOf(
+            UserBookmark("id1", "/a.pdf", "Key result", "The main theorem states…", 12, 3, 100),
+            UserBookmark("id2", "/a.pdf", "tab\there\nand newline", "snip\tpet", 40, 8, 200),
+        )
+        val decoded = BookmarkCodec.decodeUser(BookmarkCodec.encodeUser(items))
+        assertEquals(items, decoded)
+    }
+
+    @Test
+    fun userBookmarks_skipMalformedLines() {
+        val good = BookmarkCodec.encodeUser(listOf(UserBookmark("i", "/d", "L", "S", 5, 2, 9)))
+        val decoded = BookmarkCodec.decodeUser("garbage line\n$good\n")
+        assertEquals(1, decoded.size)
+        assertEquals(5, decoded[0].unitIndex)
+        assertEquals(2, decoded[0].page)
+    }
+
+    @Test
     fun loadLastPicksNewestByUpdatedAt() {
         val text = BookmarkCodec.encode(
             listOf(

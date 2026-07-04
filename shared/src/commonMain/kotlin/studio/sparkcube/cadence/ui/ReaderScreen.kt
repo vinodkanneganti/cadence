@@ -54,6 +54,7 @@ fun ReaderScreen(state: ReaderState, onOpen: () -> Unit) {
                 !state.hasTextLayer -> ScannedMessage(onOpen)
                 else -> {
                     state.resumeHint?.let { ResumeBanner(it) }
+                    BookmarkBar(state)
                     ReadingSurface(state, Modifier.weight(1f))
                     ControlRail(state)
                     TransportBar(state)

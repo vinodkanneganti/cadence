@@ -9,15 +9,13 @@ import java.io.File
  * than disrupting reading.
  */
 class FileBookmarkStore(
-    file: File = File(System.getProperty("user.home"), ".cadence/bookmarks.tsv"),
+    private val file: File = File(System.getProperty("user.home"), ".cadence/bookmarks.tsv"),
+    private val userFile: File = File(System.getProperty("user.home"), ".cadence/user-bookmarks.tsv"),
 ) : BookmarkStore {
-
-    private val file = file
 
     override fun save(bookmark: Bookmark) {
         runCatching {
-            val current = readAll()
-            val updated = BookmarkCodec.upsert(current, bookmark)
+            val updated = BookmarkCodec.upsert(readAll(), bookmark)
             file.parentFile?.mkdirs()
             file.writeText(BookmarkCodec.encode(updated))
         }
@@ -29,7 +27,29 @@ class FileBookmarkStore(
     override fun loadLast(): Bookmark? =
         readAll().maxByOrNull { it.updatedAt }
 
+    override fun listBookmarks(docId: String): List<UserBookmark> =
+        readUser().filter { it.docId == docId }.sortedBy { it.unitIndex }
+
+    override fun addBookmark(bookmark: UserBookmark) {
+        writeUser(readUser().filterNot { it.id == bookmark.id } + bookmark)
+    }
+
+    override fun removeBookmark(id: String) {
+        writeUser(readUser().filterNot { it.id == id })
+    }
+
     private fun readAll(): List<Bookmark> =
         runCatching { if (file.exists()) BookmarkCodec.decode(file.readText()) else emptyList() }
             .getOrDefault(emptyList())
+
+    private fun readUser(): List<UserBookmark> =
+        runCatching { if (userFile.exists()) BookmarkCodec.decodeUser(userFile.readText()) else emptyList() }
+            .getOrDefault(emptyList())
+
+    private fun writeUser(items: List<UserBookmark>) {
+        runCatching {
+            userFile.parentFile?.mkdirs()
+            userFile.writeText(BookmarkCodec.encodeUser(items))
+        }
+    }
 }

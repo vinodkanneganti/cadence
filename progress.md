@@ -403,3 +403,30 @@ tiny/50-50 fixtures — fixed by making them body-dominated.
 ```
 
 **Result:** both features built + tested. Persistence file: `~/.cadence/bookmarks.tsv`.
+
+Tested together: user opened `~/Desktop/slc-2up.pdf`, read to unit 45, closed; bookmark persisted
+to `~/.cadence/bookmarks.tsv`; relaunch auto-reopened the doc at unit 45 (0 exceptions). Noted that
+`slc-2up.pdf` is a 2-up layout → v1 best-effort ordering (documented limitation).
+
+---
+
+## Session 7 — 2026-07-04 — T10 user bookmark list
+
+User-curated bookmarks (distinct from the single automatic resume point): add / list / jump / delete
+important spots, persisted per document. On-device (R8).
+
+- `core/bookmark/UserBookmark.kt` — `id, docId, label, snippet, unitIndex, page, createdAt`.
+- `BookmarkStore` extended: `listBookmarks(docId)`, `addBookmark`, `removeBookmark`; `NoopBookmarkStore`
+  no-ops them. `BookmarkCodec.encodeUser/decodeUser` (tab-separated + escaping).
+- Desktop `FileBookmarkStore` keeps user bookmarks in a **separate** file
+  `~/.cadence/user-bookmarks.tsv` (multiple per doc), leaving the resume file untouched.
+- `ReaderState`: `bookmarkList` state; `addBookmark(label)` (blank label → text snippet → "Page N");
+  `jumpToBookmark`, `removeBookmark`; list refreshes on open + mutations.
+- `ui/BookmarkBar.kt` — a "Bookmarks" row under the header: optional name field + **＋ Add here**, then
+  scrollable chips ("p{page} · {label}") — click a chip to jump, ✕ to delete.
+
+**Tests:** `BookmarkCodecTest` +2 (user round-trip with tabs/newlines; skip malformed). 49 green.
+
+```bash
+./gradlew :shared:desktopTest   # 49 tests, 0 failures
+```

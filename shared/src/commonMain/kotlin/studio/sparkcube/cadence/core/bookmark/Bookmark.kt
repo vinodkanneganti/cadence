@@ -23,13 +23,22 @@ data class Bookmark(
  * file-backed store; tests and non-desktop targets use [NoopBookmarkStore].
  */
 interface BookmarkStore {
+    // Automatic resume point (one per document).
     fun save(bookmark: Bookmark)
     fun loadForDoc(docId: String): Bookmark?
     fun loadLast(): Bookmark?
+
+    // User-curated bookmark list (many per document).
+    fun listBookmarks(docId: String): List<UserBookmark>
+    fun addBookmark(bookmark: UserBookmark)
+    fun removeBookmark(id: String)
 }
 
 object NoopBookmarkStore : BookmarkStore {
     override fun save(bookmark: Bookmark) {}
     override fun loadForDoc(docId: String): Bookmark? = null
     override fun loadLast(): Bookmark? = null
+    override fun listBookmarks(docId: String): List<UserBookmark> = emptyList()
+    override fun addBookmark(bookmark: UserBookmark) {}
+    override fun removeBookmark(id: String) {}
 }

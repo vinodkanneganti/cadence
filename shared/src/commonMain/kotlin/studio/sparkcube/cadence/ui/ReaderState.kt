@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import studio.sparkcube.cadence.core.bookmark.Bookmark
 import studio.sparkcube.cadence.core.bookmark.BookmarkStore
 import studio.sparkcube.cadence.core.bookmark.NoopBookmarkStore
+import studio.sparkcube.cadence.core.bookmark.UserBookmark
 import studio.sparkcube.cadence.core.model.Density
 import studio.sparkcube.cadence.core.model.Mode
 import studio.sparkcube.cadence.core.model.Step
@@ -56,6 +57,7 @@ class ReaderState(
 
     var pageCount by mutableStateOf(0); private set
     var resumeHint by mutableStateOf<String?>(null); private set
+    var bookmarkList by mutableStateOf<List<UserBookmark>>(emptyList()); private set
     private var pages: List<Int> = emptyList()
     private var docId: String? = null
     private var docPath: String? = null
@@ -116,6 +118,7 @@ class ReaderState(
                 recall.reset()
                 rebuild()
                 restoreBookmark()
+                refreshBookmarkList()
             } catch (e: Throwable) {
                 docName = picked.name
                 errorMessage = "Couldn't open this PDF: ${e.message ?: "unknown error"}"
@@ -160,6 +163,44 @@ class ReaderState(
     fun previewVoice() {
         player.pause(); playing = false; stopTicker()
         speaker.speak("This is the selected voice.", targetWpm = 160, onDone = {}, onError = {})
+    }
+
+    /** Add a bookmark at the current position; [label] blank → uses a text snippet. */
+    fun addBookmark(label: String) {
+        val id = docId ?: return
+        if (steps.isEmpty()) return
+        val snippet = steps.getOrNull(activeIndex)?.text?.take(80) ?: ""
+        val name = label.trim().ifBlank { snippet.take(40).ifBlank { "Page $currentPage" } }
+        bookmarks.addBookmark(
+            UserBookmark(
+                id = "${now()}-$activeIndex",
+                docId = id,
+                label = name,
+                snippet = snippet,
+                unitIndex = activeIndex,
+                page = currentPage,
+                createdAt = now(),
+            ),
+        )
+        refreshBookmarkList()
+    }
+
+    fun jumpToBookmark(b: UserBookmark) {
+        if (steps.isEmpty()) return
+        player.seekTo(b.unitIndex.coerceIn(0, steps.size - 1))
+        activeIndex = player.index
+        playing = false
+        stopTicker()
+        resumeHint = null
+    }
+
+    fun removeBookmark(b: UserBookmark) {
+        bookmarks.removeBookmark(b.id)
+        refreshBookmarkList()
+    }
+
+    private fun refreshBookmarkList() {
+        bookmarkList = docId?.let { bookmarks.listBookmarks(it) } ?: emptyList()
     }
 
     fun continueRecall() {

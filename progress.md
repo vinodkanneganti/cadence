@@ -528,5 +528,36 @@ Goal for this stage: iOS targets + actuals **compile and link as a framework** (
 ./gradlew :shared:desktopTest                           # still 49 tests, 0 failures
 ```
 
-**Result:** iOS framework compiles + links (Compose UI + AVSpeech + PDFKit). **Stage 2 next:** an
-Xcode `iosApp` that hosts `MainViewController`, wire the UIDocumentPicker, and run on the simulator.
+**Result:** iOS framework compiles + links (Compose UI + AVSpeech + PDFKit).
+
+## Session 9 (cont.) — iOS stage 2: Xcode app builds
+
+User chose "build the project, I'll run it in Xcode" (no iOS simulator runtime is installed —
+`xcrun simctl list runtimes` is empty — and no iPhone connected, so running here would need a ~7 GB
+runtime download).
+
+- Created `iosApp/` Xcode project (hand-written `project.pbxproj`, `iOSApp.swift`,
+  `ContentView.swift` hosting `MainViewControllerKt.MainViewController()`, `Info.plist`). Framework
+  is embedded via a "Compile Kotlin Framework" run-script phase → `:shared:embedAndSignAppleFrameworkForXcode`,
+  linked with `-framework Shared` + `FRAMEWORK_SEARCH_PATHS` to `shared/build/xcode-frameworks/...`.
+  `ENABLE_USER_SCRIPT_SANDBOXING = NO` so the Gradle phase can run.
+- Wired the real **UIDocumentPicker** (`pickPdfIos()` in iosMain): presents
+  `UIDocumentPickerViewController(forOpeningContentTypes:[UTTypePDF])`, reads the security-scoped
+  URL's bytes (`NSData` → `ByteArray` via `memcpy`), returns a `PickedPdf`. Delegate held in a var
+  (weak ref). So the iOS app can actually open PDFs.
+
+```bash
+./gradlew :shared:compileKotlinIosSimulatorArm64          # BUILD SUCCESSFUL
+xcodebuild -project iosApp/iosApp.xcodeproj -target iosApp \
+  -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build   # ** BUILD SUCCEEDED **
+```
+
+**Result:** the iOS app **builds** (Swift + embedded Compose framework + document picker link
+cleanly). To run: open `iosApp/iosApp.xcodeproj` in Xcode → pick a simulator (Xcode offers to
+download a runtime the first time) or a signed device → Run. One cosmetic linker warning (bundled
+ICU targets iOS 17.2 vs app min 15.0).
+
+**Cadence now targets all three platforms** — macOS desktop (running), Android (running on device),
+iOS (builds; runnable in Xcode). Remaining iOS follow-ups: verify on a real simulator/device;
+`initialPdf` auto-resume returns null on iOS for now (security-scoped URLs need bookmark data to
+reopen across launches).

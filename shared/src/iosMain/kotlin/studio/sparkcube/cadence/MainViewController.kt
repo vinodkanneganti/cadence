@@ -15,12 +15,10 @@ import studio.sparkcube.cadence.ui.PickedPdf
 @OptIn(ExperimentalForeignApi::class)
 fun MainViewController(): UIViewController = ComposeUIViewController {
     App(
-        pickPdf = { pickPdf() },
+        pickPdf = { pickPdfIos() },
         bookmarks = IosBookmarkStore(),
         // CFAbsoluteTime is seconds since 2001 — monotonic enough to order bookmarks.
         now = { (CFAbsoluteTimeGetCurrent() * 1000).toLong() },
         initialPdf = { null },
     )
 }
-
-private suspend fun pickPdf(): PickedPdf? = null

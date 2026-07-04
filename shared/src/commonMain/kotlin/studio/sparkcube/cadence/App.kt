@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -21,6 +22,9 @@ import studio.sparkcube.cadence.core.bookmark.BookmarkStore
 import studio.sparkcube.cadence.core.bookmark.NoopBookmarkStore
 import studio.sparkcube.cadence.core.pdf.PdfExtractor
 import studio.sparkcube.cadence.core.tts.Speaker
+import studio.sparkcube.cadence.ui.DarkPalette
+import studio.sparkcube.cadence.ui.LightPalette
+import studio.sparkcube.cadence.ui.LocalPalette
 import studio.sparkcube.cadence.ui.PickedPdf
 import studio.sparkcube.cadence.ui.ReaderScreen
 import studio.sparkcube.cadence.ui.ReaderState
@@ -52,22 +56,26 @@ fun App(
 
         fun openPdf() = scope.launch { pickPdf()?.let { state.open(it) } }
 
-        Box(
-            Modifier
-                .fillMaxSize()
-                .focusRequester(focus)
-                .focusable()
-                .onPreviewKeyEvent { e ->
-                    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (e.key) {
-                        Key.Spacebar -> { state.togglePlay(); true }
-                        Key.DirectionRight -> { state.next(); true }
-                        Key.DirectionLeft -> { state.prev(); true }
-                        else -> false
-                    }
-                },
+        CompositionLocalProvider(
+            LocalPalette provides if (state.dark) DarkPalette else LightPalette,
         ) {
-            ReaderScreen(state, onOpen = { openPdf() })
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .focusRequester(focus)
+                    .focusable()
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.Spacebar -> { state.togglePlay(); true }
+                            Key.DirectionRight -> { state.next(); true }
+                            Key.DirectionLeft -> { state.prev(); true }
+                            else -> false
+                        }
+                    },
+            ) {
+                ReaderScreen(state, onOpen = { openPdf() })
+            }
         }
     }
 }

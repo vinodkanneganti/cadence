@@ -67,6 +67,11 @@ class ReaderState(
     var mode by mutableStateOf(Mode.LEARNING); private set
     var basePaceOffset by mutableStateOf(0); private set
 
+    // Appearance (on-screen only; independent of narration)
+    var dark by mutableStateOf(false); private set
+    var readingSizeSp by mutableStateOf(19f); private set
+    var readingFont by mutableStateOf(ReadingFont.Serif); private set
+
     var voices by mutableStateOf<List<VoiceInfo>>(emptyList()); private set
     var selectedVoice by mutableStateOf<VoiceInfo?>(null); private set
     var sayAvailable by mutableStateOf(true); private set
@@ -161,6 +166,10 @@ class ReaderState(
     fun selectMode(m: Mode) { mode = m; rebuildPreservingPause() }
     fun nudgeBasePace(offset: Int) { basePaceOffset = offset.coerceIn(-25, 25); rebuildPreservingPause() }
     fun chooseVoice(v: VoiceInfo) { selectedVoice = v; speaker.setVoice(v.id) }
+
+    fun toggleDark() { dark = !dark }
+    fun setReadingSize(sp: Float) { readingSizeSp = sp.coerceIn(15f, 26f) }
+    fun selectReadingFont(f: ReadingFont) { readingFont = f }
 
     /** Re-query installed voices (Android TTS reports them only after async init). */
     fun refreshVoices() {

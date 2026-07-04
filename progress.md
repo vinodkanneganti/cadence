@@ -561,3 +561,37 @@ ICU targets iOS 17.2 vs app min 15.0).
 iOS (builds; runnable in Xcode). Remaining iOS follow-ups: verify on a real simulator/device;
 `initialPdf` auto-resume returns null on iOS for now (security-scoped URLs need bookmark data to
 reopen across launches).
+
+---
+
+## Session 10 — 2026-07-04 — UI polish (T14)
+
+Reworked the UI toward a premium reader, inspired by reference screenshots (clean reading surface,
+"Aa" settings popover, light/dark, minimal chrome). All in commonMain → benefits all platforms.
+
+- **Theme:** `Palette` data class with `LightPalette`/`DarkPalette` via `LocalPalette`
+  (`staticCompositionLocalOf`); every UI file now reads `LocalPalette.current`. Accent is a confident
+  blue; warm paper in light, charcoal in dark.
+- **Reading-first surface:** centered measure (max 720dp), adjustable reading size (15–26sp slider)
+  and font (Serif/Sans), 1.62 line-height, section headings larger/bold, subtle active-line
+  highlight, breathing space after paragraphs/sections (dropped the explicit "pause" labels).
+- **Declutter:** removed the always-on ControlRail / TransportBar / BookmarkBar. Narration + appearance
+  now live in an **"Aa" settings popover** (`SettingsPanel`); bookmarks in a **☆ popover**
+  (`BookmarksPanel`). Both are scrim-backed top-right cards (tap outside to dismiss).
+- **Top bar:** doc title + ☆count + Aa + Open. **Bottom bar:** thin progress line, "Page x / n"
+  (left), a prominent circular Play button flanked by prev/next/section, "wpm" (right).
+- **Dark mode** toggle (☀/☾) in settings.
+- State: added `dark`, `readingSizeSp`, `readingFont` (+ mutators) — appearance only, no engine impact.
+
+**Fixes:** `clip` import; `setReadingFont` renamed to `selectReadingFont` (JVM setter clash with the
+`readingFont` property).
+
+```bash
+./gradlew :shared:compileKotlinDesktop   # BUILD SUCCESSFUL
+./gradlew :shared:run                    # launches, no exceptions
+./gradlew :shared:desktopTest            # 49 tests, 0 failures
+./gradlew :androidApp:assembleDebug      # APK built (reinstall pending — phone disconnected)
+```
+
+**Result:** cleaner reading-first UI + dark mode + adjustable typography, shared across desktop /
+Android / iOS. Verified on desktop; Android APK built (reinstall when the phone reconnects).

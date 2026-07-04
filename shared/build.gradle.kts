@@ -15,6 +15,13 @@ kotlin {
         compilerOptions { jvmTarget.set(JvmTarget.JVM_11) }
     }
 
+    listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "Shared"
+            isStatic = true
+        }
+    }
+
     // `expect class Speaker`/`PdfExtractor` are the sanctioned platform boundaries;
     // silence the "expect/actual classes are in Beta" advisory for them.
     compilerOptions {

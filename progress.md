@@ -486,3 +486,47 @@ property); PDFBox init moved into `:shared` so the app module doesn't depend on 
   populate after TTS init). Verified on-device: clean, nothing overflows.
   (Kotlin gotcha: `Modifier.weight` is a `RowScope`/`ColumnScope` member — don't import it
   top-level; make helpers `RowScope.` extensions.)
+
+### Android playback fixes (real-device)
+- Device had **no default TTS engine** (`tts_default_synth=null`) though Google TTS was installed →
+  default `TextToSpeech` never initialized. `Speaker` now discovers an installed engine (prefers
+  `com.google.android.tts`) and passes it explicitly. Verified `init status=0 ready=true`.
+- A speech `onError` was routed to the fatal `errorMessage` (which gates the whole reader) → the
+  menu vanished on Play. Split into a transient `playbackNote` banner. Also queue a `speak` issued
+  before async TTS init and fire it on ready.
+
+**Result: Cadence runs on the user's Galaxy S24 Ultra** — installed, launched, responsive UI,
+auto-resume, and (after the engine fix) TTS ready. User confirmed basic functionality; UI polish
+deferred until after iOS.
+
+---
+
+## Session 9 — 2026-07-04 — Mobile, part 2: iOS framework (T13, stage 1)
+
+Goal for this stage: iOS targets + actuals **compile and link as a framework** (mirrors Android's
+"APK assembles"). Running on the simulator (Xcode app) is stage 2.
+
+- `shared`: added `iosX64()` / `iosArm64()` / `iosSimulatorArm64()` with a static `Shared` framework.
+- iOS actuals (iosMain):
+  - `Speaker` — AVSpeechSynthesizer + `AVSpeechSynthesizerDelegate` (didFinish → onDone); audio
+    session `.playback`; the **rate trap**: `rate = DefaultSpeechRate * (wpm/BASE_VOICE_WPM)` clamped
+    to platform min/max (AVSpeechUtterance.rate is 0..1, not a wpm multiplier).
+  - `PdfExtractor` — PDFKit `PDFDocument`/`PDFPage.string`; infers structure from text (short lines
+    w/o terminal punctuation → SECTION via a larger synthetic height; blank lines → paragraph gaps),
+    feeding the same pure `PdfStructure`. (v1: no true font metrics — a documented limitation.)
+  - `IosBookmarkStore` — TSV files in the Documents dir via Foundation, reusing `BookmarkCodec`.
+  - `MainViewController()` — `ComposeUIViewController { App(...) }`; `now` via `CFAbsoluteTimeGetCurrent`.
+    Document picker (UIDocumentPicker) deferred to stage 2 (`pickPdf` returns null for now).
+
+**Kotlin/Native cinterop fixes:** enum constants qualify (`AVSpeechBoundary.AVSpeechBoundaryImmediate`);
+`AVAudioSession.setCategory(category, null)` (error-param form) and drop `setActive`; use
+`CFAbsoluteTimeGetCurrent()` instead of `NSDate.timeIntervalSince1970`.
+
+```bash
+./gradlew :shared:compileKotlinIosSimulatorArm64        # BUILD SUCCESSFUL
+./gradlew :shared:linkDebugFrameworkIosSimulatorArm64   # BUILD SUCCESSFUL → Shared.framework
+./gradlew :shared:desktopTest                           # still 49 tests, 0 failures
+```
+
+**Result:** iOS framework compiles + links (Compose UI + AVSpeech + PDFKit). **Stage 2 next:** an
+Xcode `iosApp` that hosts `MainViewController`, wire the UIDocumentPicker, and run on the simulator.

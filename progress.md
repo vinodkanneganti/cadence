@@ -280,3 +280,27 @@ pure, unit-tested `commonMain` — same philosophy as the pacing engine.
 
 **v1 limitations (documented):** multi-column/footnote order is best-effort y-then-x; paragraphs may
 merge across page boundaries (y resets per page). Matches the PRD's stated scope.
+
+---
+
+## Session 4 — 2026-07-04 — T5 RecallScheduler
+
+Pure, clock-injectable scheduler for active-recall prompts.
+
+**New file:** `commonMain/…/core/recall/RecallScheduler.kt`
+- Fires `onRecallDue` on **2 sections OR 5 minutes, whichever first** (defaults from `RecallConfig`).
+- `onSectionBoundary()` counts sections; `onTick()` checks the elapsed-time trigger (driven by the
+  app, e.g. per unit start or a 1 Hz ticker); `nowMs` is injected for testability.
+- Once due, further triggers are ignored until `continueReading()` resets counters + the time anchor.
+
+**Tests (pure, commonTest):** `RecallSchedulerTest` (5) — fires after 2 sections (AC5 logic), fires
+after 5 min, whichever-first with no double-fire, continue resets and can re-fire, time trigger
+counts from the last continue.
+
+```bash
+./gradlew :shared:desktopTest --console=plain   # BUILD SUCCESSFUL
+# => 39 tests green (engine 10, complexity 4, player 5, sentence 7, structure 6, pdf 2, recall 5)
+```
+
+**Result:** T5 scheduler logic complete + tested. The end-to-end AC5 behaviour (pause playback +
+show the recall overlay + resume on Continue) is wired into the UI in T6/T7.

@@ -10,7 +10,7 @@
         android:theme="@style/Theme.Cadence">
 
         <activity
-            android:name=".MainActivity"
+            android:name="studio.sparkcube.cadence.MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize">

@@ -168,6 +168,7 @@ private fun SentenceRow(step: Step, active: Boolean, sizeSp: Float, font: Readin
 private fun BottomBar(state: ReaderState) {
     val pal = LocalPalette.current
     Column(Modifier.fillMaxWidth().background(pal.paper)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(pal.hairline))
         LinearProgressIndicator(
             progress = { state.progress },
             modifier = Modifier.fillMaxWidth().height(2.dp),
@@ -175,7 +176,7 @@ private fun BottomBar(state: ReaderState) {
             trackColor = pal.hairline,
         )
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 22.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f)) {

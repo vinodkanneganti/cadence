@@ -27,6 +27,7 @@ dependencyResolutionManagement {
     }
 }
 
-// Phase 0 is desktop-first. Android/iOS app modules are added in Phase 1
-// once their toolchains are confirmed. The shared module holds all common code.
+// The shared module holds all common code + the desktop app.
 include(":shared")
+// Android application module (depends on :shared).
+include(":androidApp")

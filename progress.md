@@ -430,3 +430,42 @@ important spots, persisted per document. On-device (R8).
 ```bash
 ./gradlew :shared:desktopTest   # 49 tests, 0 failures
 ```
+
+---
+
+## Session 8 — 2026-07-04 — Mobile, part 1: Android target (T11–T12)
+
+### T11 — Install Android SDK
+No SDK existed (Android Studio present but never downloaded one). Installed via command line:
+```bash
+brew install --cask android-commandlinetools
+yes | sdkmanager --sdk_root=/opt/homebrew/share/android-commandlinetools --licenses
+sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+```
+`local.properties` → `sdk.dir=/opt/homebrew/share/android-commandlinetools` (gitignored).
+
+### T12 — Android target + actuals (APK assembles)
+- Catalog: AGP 8.7.3, `kotlin-android`, `androidx.activity:activity-compose` 1.9.3,
+  `com.tom-roush:pdfbox-android` 2.0.27.0. `gradle.properties`: `android.useAndroidX=true`,
+  `android.nonTransitiveRClass=true`. Root declares AGP + `kotlin-android` `apply false`.
+- `shared`: added `com.android.library` + `androidTarget()` (jvmTarget 11) + `android { namespace
+  = ...shared, compileSdk 35, minSdk 24 }`; androidMain dep `pdfbox-android`.
+- Android actuals (androidMain): `Speaker` (TextToSpeech, one utterance per QUEUE_FLUSH,
+  `setSpeechRate(wpm/BASE_VOICE_WPM)`), `PdfExtractor` (PdfBox-Android, same pure builder),
+  `AndroidBookmarkStore` (files under `filesDir`), and `AndroidApp.init(context)` (holds Context +
+  `PDFBoxResourceLoader.init`, keeping PDFBox inside `:shared`).
+- New `:androidApp` module (`com.android.application`, appId `studio.sparkcube.cadence`, no INTERNET
+  permission → on-device). `MainActivity` wires SAF `OpenDocument` picker (persistable URI grant) as
+  `pickPdf`, `initialPdf` reopens the last doc, `now`, and the bookmark store into `App(...)`.
+
+**Fixes:** plugin-classpath conflict (declare `kotlin-android` at root `apply false`); `useAndroidX`;
+`Speaker` recursive `tts` init (→ `lateinit`/init block) and `setLanguage(...)` (setter-only, not a
+property); PDFBox init moved into `:shared` so the app module doesn't depend on PDFBox.
+
+```bash
+./gradlew :androidApp:assembleDebug   # BUILD SUCCESSFUL → androidApp-debug.apk (19 MB)
+./gradlew :shared:desktopTest         # still 49 tests, 0 failures
+```
+
+**Result:** Android **compiles + assembles**. Running needs a device or an emulator system image
+(none installed yet — `adb devices` empty). iOS target (T13) is next.

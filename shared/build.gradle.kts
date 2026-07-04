@@ -1,16 +1,19 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.androidLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
 }
 
 kotlin {
-    // Phase 0: desktop JVM only (macOS `say` TTS). Android/iOS targets are added
-    // in Phase 1. The pacing engine in commonMain is target-independent, so the
-    // Phase 0 gate is fully reachable with just this target.
     jvm("desktop")
+
+    androidTarget {
+        compilerOptions { jvmTarget.set(JvmTarget.JVM_11) }
+    }
 
     // `expect class Speaker`/`PdfExtractor` are the sanctioned platform boundaries;
     // silence the "expect/actual classes are in Beta" advisory for them.
@@ -42,6 +45,23 @@ kotlin {
                 implementation(libs.pdfbox)
             }
         }
+        val androidMain by getting {
+            dependencies {
+                implementation(libs.pdfbox.android)
+            }
+        }
+    }
+}
+
+android {
+    namespace = "studio.sparkcube.cadence.shared"
+    compileSdk = 35
+    defaultConfig {
+        minSdk = 24
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 }
 

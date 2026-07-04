@@ -15,8 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,13 +27,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import studio.sparkcube.cadence.core.model.Boundary
@@ -53,6 +54,8 @@ fun ReaderScreen(state: ReaderState, onOpen: () -> Unit) {
                 state.docName == null -> EmptyState(onOpen)
                 !state.hasTextLayer -> ScannedMessage(onOpen)
                 else -> {
+                    MetaBar(state)
+                    if (state.pageCount > 1) PageBar(state)
                     state.resumeHint?.let { ResumeBanner(it) }
                     BookmarkBar(state)
                     ReadingSurface(state, Modifier.weight(1f))
@@ -66,65 +69,74 @@ fun ReaderScreen(state: ReaderState, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun ResumeBanner(text: String) {
+private fun Header(state: ReaderState, onOpen: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().background(CadenceColors.AccentSoft).padding(horizontal = 24.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("↻  $text", fontSize = 12.sp, color = CadenceColors.Accent, fontWeight = FontWeight.Medium)
+        Text("Cadence", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = CadenceColors.Ink)
+        Spacer(Modifier.weight(1f))
+        Button(
+            onClick = onOpen,
+            colors = ButtonDefaults.buttonColors(containerColor = CadenceColors.Accent),
+        ) { Text("Open", color = Color.White) }
+    }
+}
+
+/** Document name + progress %. Name ellipsizes; nothing overflows on a phone. */
+@Composable
+private fun MetaBar(state: ReaderState) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            state.docName ?: "",
+            fontSize = 13.sp,
+            color = CadenceColors.Muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text("${(state.progress * 100).toInt()}%", fontSize = 13.sp, color = CadenceColors.Faint)
     }
 }
 
 @Composable
-private fun PageJump(state: ReaderState) {
+private fun PageBar(state: ReaderState) {
     var field by remember { mutableStateOf("") }
     fun go() {
         field.trim().toIntOrNull()?.let { state.jumpToPage(it) }
         field = ""
     }
-    Text("Page ${state.currentPage} / ${state.pageCount}", fontSize = 12.sp, color = CadenceColors.Muted)
-    Spacer(Modifier.width(8.dp))
-    OutlinedTextField(
-        value = field,
-        onValueChange = { v -> field = v.filter { it.isDigit() }.take(5) },
-        singleLine = true,
-        placeholder = { Text("Go to…", fontSize = 12.sp) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Go),
-        keyboardActions = KeyboardActions(onGo = { go() }),
-        modifier = Modifier.width(110.dp),
-    )
-    Spacer(Modifier.width(6.dp))
-    OutlinedButton(onClick = { go() }, enabled = field.isNotBlank()) { Text("Go") }
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Page ${state.currentPage} / ${state.pageCount}", fontSize = 12.sp, color = CadenceColors.Muted)
+        Spacer(Modifier.weight(1f))
+        OutlinedTextField(
+            value = field,
+            onValueChange = { v -> field = v.filter { it.isDigit() }.take(5) },
+            singleLine = true,
+            placeholder = { Text("Pg", fontSize = 12.sp) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { go() }),
+            modifier = Modifier.width(96.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        OutlinedButton(onClick = { go() }, enabled = field.isNotBlank()) { Text("Go") }
+    }
 }
 
 @Composable
-private fun Header(state: ReaderState, onOpen: () -> Unit) {
+private fun ResumeBanner(text: String) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+        Modifier.fillMaxWidth().background(CadenceColors.AccentSoft).padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Cadence", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = CadenceColors.Ink)
-        Spacer(Modifier.width(16.dp))
-        state.docName?.let {
-            Text(it, fontSize = 13.sp, color = CadenceColors.Muted)
-        }
-        Spacer(Modifier.weight(1f))
-        if (state.docName != null && state.hasTextLayer && state.pageCount > 0) {
-            PageJump(state)
-            Spacer(Modifier.width(16.dp))
-        }
-        if (state.docName != null) {
-            Text("${(state.progress * 100).toInt()}%", fontSize = 13.sp, color = CadenceColors.Faint)
-            Spacer(Modifier.width(12.dp))
-        }
-        if (!state.sayAvailable) {
-            Text("`say` unavailable", fontSize = 12.sp, color = CadenceColors.Error)
-            Spacer(Modifier.width(12.dp))
-        }
-        Button(
-            onClick = onOpen,
-            colors = ButtonDefaults.buttonColors(containerColor = CadenceColors.Accent),
-        ) { Text("Open PDF", color = Color.White) }
+        Text("↻  $text", fontSize = 12.sp, color = CadenceColors.Accent, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -134,14 +146,12 @@ private fun ReadingSurface(state: ReaderState, modifier: Modifier) {
     LaunchedEffect(state.activeIndex) {
         if (state.steps.isNotEmpty()) listState.animateScrollToItem(state.activeIndex)
     }
-    Box(modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-        Box(
-            Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(CadenceColors.Card),
-        ) {
+    Box(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(CadenceColors.Card)) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(28.dp),
+                contentPadding = PaddingValues(20.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 itemsIndexed(state.steps) { i, step ->
@@ -163,30 +173,18 @@ private fun SentenceRow(step: Step, active: Boolean) {
                 .clip(RoundedCornerShape(6.dp))
                 .background(if (active) CadenceColors.Highlight else Color.Transparent)
                 .padding(horizontal = 8.dp, vertical = 5.dp),
-            fontSize = if (isSection) 20.sp else 17.sp,
+            fontSize = if (isSection) 19.sp else 17.sp,
             fontWeight = if (isSection || active) FontWeight.SemiBold else FontWeight.Normal,
             color = CadenceColors.Ink,
         )
-        // Upcoming-pause marker sized by the boundary.
         if (step.boundary != Boundary.SENTENCE) {
-            PauseMarker(step.boundary)
+            Text(
+                if (isSection) "— section pause —" else "— paragraph pause —",
+                fontSize = 10.sp,
+                color = CadenceColors.Faint,
+                modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 2.dp),
+            )
         }
-    }
-}
-
-@Composable
-private fun PauseMarker(boundary: Boundary) {
-    val width = if (boundary == Boundary.SECTION) 64.dp else 32.dp
-    Row(Modifier.padding(start = 8.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(width).background(CadenceColors.AccentSoft).clip(RoundedCornerShape(2.dp)).padding(2.dp)) {
-            Spacer(Modifier.width(width))
-        }
-        Spacer(Modifier.width(6.dp))
-        Text(
-            if (boundary == Boundary.SECTION) "section pause" else "paragraph pause",
-            fontSize = 10.sp,
-            color = CadenceColors.Faint,
-        )
     }
 }
 

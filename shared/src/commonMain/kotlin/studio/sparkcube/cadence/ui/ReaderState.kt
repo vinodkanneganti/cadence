@@ -160,6 +160,16 @@ class ReaderState(
     fun nudgeBasePace(offset: Int) { basePaceOffset = offset.coerceIn(-25, 25); rebuildPreservingPause() }
     fun chooseVoice(v: VoiceInfo) { selectedVoice = v; speaker.setVoice(v.id) }
 
+    /** Re-query installed voices (Android TTS reports them only after async init). */
+    fun refreshVoices() {
+        val vs = speaker.voices()
+        if (vs.isNotEmpty()) {
+            voices = vs.sortedWith(
+                compareByDescending<VoiceInfo> { it.locale.startsWith("en") }.thenBy { it.name },
+            )
+        }
+    }
+
     fun previewVoice() {
         player.pause(); playing = false; stopTicker()
         speaker.speak("This is the selected voice.", targetWpm = 160, onDone = {}, onError = {})

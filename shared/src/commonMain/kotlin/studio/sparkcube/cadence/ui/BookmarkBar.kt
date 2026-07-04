@@ -39,30 +39,28 @@ fun BookmarkBar(state: ReaderState) {
     var name by remember { mutableStateOf("") }
     fun add() { state.addBookmark(name); name = "" }
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Bookmarks", fontSize = 12.sp, color = CadenceColors.Muted, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.width(12.dp))
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it.take(40) },
                 singleLine = true,
-                placeholder = { Text("Name this spot (optional)", fontSize = 12.sp) },
+                placeholder = { Text("Bookmark this spot…", fontSize = 12.sp) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { add() }),
-                modifier = Modifier.widthIn(max = 260.dp),
+                modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(8.dp))
             Button(
                 onClick = { add() },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = CadenceColors.Accent),
-            ) { Text("＋ Add here", color = Color.White) }
+            ) { Text("＋ Add", color = Color.White) }
         }
 
         if (state.bookmarkList.isNotEmpty()) {
-            Spacer(Modifier.width(6.dp))
             Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp).horizontalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().padding(top = 6.dp).horizontalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 state.bookmarkList.forEach { bm ->

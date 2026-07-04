@@ -469,3 +469,20 @@ property); PDFBox init moved into `:shared` so the app module doesn't depend on 
 
 **Result:** Android **compiles + assembles**. Running needs a device or an emulator system image
 (none installed yet — `adb devices` empty). iOS target (T13) is next.
+
+### Ran on a physical phone + responsive-layout fix
+- Installed on the user's **Galaxy S24 Ultra** (`adb install`); fixed the launcher activity name
+  (`android:name` must be fully-qualified since the app namespace `...cadence.app` ≠ MainActivity's
+  package `...cadence`). App launches + runs; auto-resume reopened a real 106-page PDF at page 3.
+- **Bug the user hit: UI "all jumbled" on Android.** The desktop layout used wide horizontal `Row`s
+  sized for a ~1000px window; on a ~360dp phone they overflowed into vertical single-char columns.
+  Also a false "`say` unavailable" banner (Mac-specific label; Android `TextToSpeech.voices()` is
+  empty until async init).
+- **Fix (responsive UI, commonMain):** rebuilt `ReaderScreen` header into stacked Header/MetaBar/
+  PageBar rows (name ellipsizes, page-jump field flexes); `ControlRail` density/mode chips now wrap
+  via `FlowRow`, pace slider + voice on their own flexible rows; `TransportBar` uses `FlowRow` for
+  readouts; `BookmarkBar` name field uses `weight(1f)`. Removed the `say`-availability banner;
+  added `ReaderState.refreshVoices()` (re-queries when the voice dropdown opens, so Android voices
+  populate after TTS init). Verified on-device: clean, nothing overflows.
+  (Kotlin gotcha: `Modifier.weight` is a `RowScope`/`ColumnScope` member — don't import it
+  top-level; make helpers `RowScope.` extensions.)

@@ -8,20 +8,27 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import studio.sparkcube.cadence.core.bookmark.Bookmark
+import studio.sparkcube.cadence.core.bookmark.BookmarkStore
+import studio.sparkcube.cadence.core.bookmark.NoopBookmarkStore
 import studio.sparkcube.cadence.core.model.Density
 import studio.sparkcube.cadence.core.model.Mode
 import studio.sparkcube.cadence.core.model.Step
 import studio.sparkcube.cadence.core.model.Unit as ReadUnit
 import studio.sparkcube.cadence.core.pacing.PacingEngine
 import studio.sparkcube.cadence.core.pdf.PdfExtractor
+import studio.sparkcube.cadence.core.pdf.PdfStructure
 import studio.sparkcube.cadence.core.player.Player
 import studio.sparkcube.cadence.core.recall.RecallScheduler
 import studio.sparkcube.cadence.core.tts.Speaker
 import studio.sparkcube.cadence.core.tts.VoiceInfo
 import kotlin.time.TimeSource
 
-/** A picked document: display name + raw bytes (supplied by the platform file picker). */
-class PickedPdf(val name: String, val bytes: ByteArray)
+/**
+ * A picked document: display name, raw bytes, and (if the platform knows it) the
+ * absolute file path — used as the stable bookmark id and to reopen on restart.
+ */
+class PickedPdf(val name: String, val bytes: ByteArray, val path: String? = null)
 
 /**
  * Coordinates the engine, player, PDF extractor, and recall scheduler, and exposes
@@ -32,6 +39,8 @@ class ReaderState(
     private val scope: CoroutineScope,
     private val speaker: Speaker,
     private val extractor: PdfExtractor,
+    private val bookmarks: BookmarkStore = NoopBookmarkStore,
+    private val now: () -> Long = { 0L },
 ) {
     var docName by mutableStateOf<String?>(null); private set
     var loading by mutableStateOf(false); private set
@@ -45,6 +54,12 @@ class ReaderState(
     var recallDue by mutableStateOf(false); private set
     var errorMessage by mutableStateOf<String?>(null); private set
 
+    var pageCount by mutableStateOf(0); private set
+    var resumeHint by mutableStateOf<String?>(null); private set
+    private var pages: List<Int> = emptyList()
+    private var docId: String? = null
+    private var docPath: String? = null
+
     var density by mutableStateOf(Density.STANDARD); private set
     var mode by mutableStateOf(Mode.LEARNING); private set
     var basePaceOffset by mutableStateOf(0); private set
@@ -55,6 +70,7 @@ class ReaderState(
 
     val currentWpm: Int get() = steps.getOrNull(activeIndex)?.targetWpm ?: 0
     val progress: Float get() = if (steps.isEmpty()) 0f else (activeIndex + 1f) / steps.size
+    val currentPage: Int get() = pages.getOrNull(activeIndex) ?: 1
 
     private val player = Player(speaker, scope)
     private var startMark = TimeSource.Monotonic.markNow()
@@ -88,13 +104,18 @@ class ReaderState(
             try {
                 val result = extractor.extract(picked.bytes)
                 docName = picked.name
+                docId = picked.path ?: picked.name
+                docPath = picked.path
                 hasTextLayer = result.hasTextLayer
                 units = result.units
+                pages = result.pages
+                pageCount = result.pageCount
                 section = 0; activeIndex = 0; elapsedSeconds = 0
-                recallDue = false
+                recallDue = false; resumeHint = null
                 startMark = TimeSource.Monotonic.markNow()
                 recall.reset()
                 rebuild()
+                restoreBookmark()
             } catch (e: Throwable) {
                 docName = picked.name
                 errorMessage = "Couldn't open this PDF: ${e.message ?: "unknown error"}"
@@ -108,15 +129,28 @@ class ReaderState(
     fun togglePlay() {
         if (recallDue || steps.isEmpty()) return
         if (player.isPlaying) {
-            player.pause(); playing = false; stopTicker()
+            player.pause(); playing = false; stopTicker(); saveBookmark()
         } else {
+            resumeHint = null
             player.play(); playing = true; startTicker()
         }
     }
 
-    fun next() { player.next(); playing = player.isPlaying }
-    fun prev() { player.prev(); playing = player.isPlaying }
-    fun nextSection() { player.nextSection(); playing = player.isPlaying }
+    fun next() { player.next(); playing = player.isPlaying; clearHintAndSave() }
+    fun prev() { player.prev(); playing = player.isPlaying; clearHintAndSave() }
+    fun nextSection() { player.nextSection(); playing = player.isPlaying; clearHintAndSave() }
+
+    /** Jump so playback begins at the first unit of [page] (1-based). */
+    fun jumpToPage(page: Int) {
+        if (steps.isEmpty()) return
+        val target = PdfStructure.firstUnitIndexForPage(pages, page.coerceIn(1, maxOf(1, pageCount)))
+        player.seekTo(target)
+        activeIndex = target
+        playing = false
+        stopTicker()
+        resumeHint = null
+        saveBookmark()
+    }
 
     fun selectDensity(d: Density) { density = d; rebuildPreservingPause() }
     fun selectMode(m: Mode) { mode = m; rebuildPreservingPause() }
@@ -132,6 +166,36 @@ class ReaderState(
         recallDue = false
         recall.continueReading()
         player.play(); playing = true; startTicker()
+    }
+
+    private fun clearHintAndSave() {
+        resumeHint = null
+        saveBookmark()
+    }
+
+    private fun restoreBookmark() {
+        val id = docId ?: return
+        val mark = bookmarks.loadForDoc(id) ?: return
+        if (mark.unitIndex in steps.indices && mark.unitIndex > 0) {
+            player.seekTo(mark.unitIndex)
+            activeIndex = mark.unitIndex
+            resumeHint = "Resumed at page ${currentPage} of $pageCount"
+        }
+    }
+
+    private fun saveBookmark() {
+        val id = docId ?: return
+        val name = docName ?: return
+        if (steps.isEmpty()) return
+        bookmarks.save(
+            Bookmark(
+                docId = id,
+                docName = name,
+                filePath = docPath,
+                unitIndex = activeIndex,
+                updatedAt = now(),
+            ),
+        )
     }
 
     private fun rebuild() {
@@ -160,6 +224,7 @@ class ReaderState(
                 if (player.isPlaying) {
                     elapsedSeconds += 1
                     recall.onTick()
+                    if (elapsedSeconds % 5 == 0L) saveBookmark() // periodic checkpoint
                 }
             }
         }

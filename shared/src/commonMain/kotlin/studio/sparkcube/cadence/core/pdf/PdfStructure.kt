@@ -4,8 +4,8 @@ import studio.sparkcube.cadence.core.model.Boundary
 import studio.sparkcube.cadence.core.model.Unit
 
 /**
- * Turns positioned PDF lines into ordered, boundary-tagged reading [Unit]s. Pure;
- * stdlib only, so it is exhaustively unit-testable without a real PDF.
+ * Turns positioned PDF lines into ordered, boundary-tagged reading [Unit]s, plus a
+ * parallel page list. Pure; stdlib only, so it is exhaustively unit-testable.
  *
  * Heuristics (PRD R1 / T4):
  *  - Heading → SECTION: line height ≥ 1.25× the page median AND < 12 words.
@@ -19,15 +19,17 @@ object PdfStructure {
     private const val HEADING_MAX_WORDS = 12
     private const val PARA_GAP_RATIO = 1.6
 
-    fun build(lines: List<PdfLine>): List<Unit> {
+    fun build(lines: List<PdfLine>): BuildResult {
         val clean = lines.filter { it.text.isNotBlank() }
-        if (clean.isEmpty()) return emptyList()
+        if (clean.isEmpty()) return BuildResult(emptyList(), emptyList())
 
         val medianHeight = median(clean.map { it.height })
         val medianGap = median(lineGaps(clean)).takeIf { it > 0.0 } ?: medianHeight
 
         val units = mutableListOf<Unit>()
+        val pages = mutableListOf<Int>()
         val paragraph = StringBuilder()
+        var paragraphPage = clean.first().page
 
         fun flushParagraph() {
             val text = paragraph.toString().trim()
@@ -37,6 +39,7 @@ object PdfStructure {
             sentences.forEachIndexed { idx, s ->
                 val boundary = if (idx == sentences.lastIndex) Boundary.PARAGRAPH else Boundary.SENTENCE
                 units += Unit(s, boundary)
+                pages += paragraphPage
             }
         }
 
@@ -47,6 +50,7 @@ object PdfStructure {
             if (isHeading) {
                 flushParagraph()
                 units += Unit(line.text.trim(), Boundary.SECTION)
+                pages += line.page
                 return@forEachIndexed
             }
 
@@ -54,14 +58,21 @@ object PdfStructure {
                 val gap = line.y - clean[index - 1].y
                 if (gap > PARA_GAP_RATIO * medianGap) flushParagraph()
             }
-            if (paragraph.isNotEmpty()) paragraph.append(' ')
+            if (paragraph.isEmpty()) paragraphPage = line.page
+            else paragraph.append(' ')
             paragraph.append(line.text.trim())
         }
         flushParagraph()
-        return units
+        return BuildResult(units, pages)
     }
 
-    /** Positive line-to-line advances (skips page resets / non-increasing steps). */
+    /** Index of the first unit at or after [page]; clamps to the last unit. */
+    fun firstUnitIndexForPage(pages: List<Int>, page: Int): Int {
+        if (pages.isEmpty()) return 0
+        val idx = pages.indexOfFirst { it >= page }
+        return if (idx >= 0) idx else pages.lastIndex
+    }
+
     private fun lineGaps(lines: List<PdfLine>): List<Double> =
         lines.zipWithNext { a, b -> b.y - a.y }.filter { it > 0.0 }
 

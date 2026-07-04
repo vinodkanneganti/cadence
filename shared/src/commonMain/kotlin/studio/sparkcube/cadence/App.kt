@@ -17,6 +17,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import kotlinx.coroutines.launch
+import studio.sparkcube.cadence.core.bookmark.BookmarkStore
+import studio.sparkcube.cadence.core.bookmark.NoopBookmarkStore
 import studio.sparkcube.cadence.core.pdf.PdfExtractor
 import studio.sparkcube.cadence.core.tts.Speaker
 import studio.sparkcube.cadence.ui.PickedPdf
@@ -25,19 +27,28 @@ import studio.sparkcube.cadence.ui.ReaderState
 
 /**
  * App root. [pickPdf] is supplied by the platform (desktop: an AWT file dialog),
- * keeping file access out of commonMain. Keyboard transport per PRD R7:
+ * keeping file access out of commonMain. [initialPdf] auto-reopens the last
+ * bookmarked document on launch. Keyboard transport per PRD R7:
  * space = play/pause, ←/→ = prev/next sentence.
  */
 @Composable
-fun App(pickPdf: suspend () -> PickedPdf?) {
+fun App(
+    pickPdf: suspend () -> PickedPdf?,
+    bookmarks: BookmarkStore = NoopBookmarkStore,
+    now: () -> Long = { 0L },
+    initialPdf: suspend () -> PickedPdf? = { null },
+) {
     MaterialTheme {
         val scope = rememberCoroutineScope()
         val speaker = remember { Speaker() }
         val extractor = remember { PdfExtractor() }
-        val state = remember { ReaderState(scope, speaker, extractor) }
+        val state = remember { ReaderState(scope, speaker, extractor, bookmarks, now) }
 
         val focus = remember { FocusRequester() }
-        LaunchedEffect(Unit) { focus.requestFocus() }
+        LaunchedEffect(Unit) {
+            focus.requestFocus()
+            initialPdf()?.let { state.open(it) } // resume last session, if any
+        }
 
         fun openPdf() = scope.launch { pickPdf()?.let { state.open(it) } }
 

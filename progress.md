@@ -367,3 +367,39 @@ appears; **Continue** resumes.
 
 **Next:** Phase 1 remainder needs Android SDK install (+ iOS on device) for the mobile actuals and
 the AVSpeech rate-mapping trap. Then Phase 2 (neural voices, pace ribbon T8, adaptation ramp).
+
+---
+
+## Session 6 — 2026-07-04 — Tested together + two user-requested features (T9)
+
+Ran the app together (`./gradlew :shared:run`); user opened a real PDF and it read aloud cleanly —
+no exceptions in the app log. User then requested two features (both extend PRD R11):
+
+### T9a — Jump to page
+- `PdfLine.page` + PDFBox `currentPageNo` capture; `ExtractResult.pages` + `pageCount`.
+- `PdfStructure.build` now returns `BuildResult(units, pages)` (page per unit) + pure
+  `firstUnitIndexForPage(pages, page)` helper.
+- `Player.seekTo(index)` (move playhead without auto-playing).
+- `ReaderState.jumpToPage(page)` + `currentPage`; header shows "Page X / N" with a numeric
+  field + Go (also fires on Enter).
+
+### T9b — Resume bookmarks (persist + auto-resume on restart)
+- `core/bookmark/`: `Bookmark`, `BookmarkStore` interface, `NoopBookmarkStore`, and a pure
+  `BookmarkCodec` (tab-separated encode/decode with escaping + upsert). On-device only (R8).
+- Desktop `FileBookmarkStore` → `~/.cadence/bookmarks.tsv` (best-effort; I/O failure degrades to
+  "no bookmark").
+- `PickedPdf.path`; `ReaderState` saves position (on pause, skip, jump, and a 5 s checkpoint while
+  playing) and restores it when the same doc is reopened; shows a "Resumed at page X" banner.
+- `main.kt`: on launch, `loadLast()` reopens the most recent document at its saved position;
+  `App` gained `bookmarks` / `now` / `initialPdf` params (defaults keep it testable).
+
+**Tests:** `BookmarkCodecTest` (5) + `PdfStructureTest` page tests (tracksPagePerUnit,
+firstUnitIndexForPage). Two first-run failures were the same even-length-median artifact on
+tiny/50-50 fixtures — fixed by making them body-dominated.
+
+```bash
+./gradlew :shared:compileKotlinDesktop   # BUILD SUCCESSFUL
+./gradlew :shared:desktopTest            # 47 tests, 0 failures
+```
+
+**Result:** both features built + tested. Persistence file: `~/.cadence/bookmarks.tsv`.

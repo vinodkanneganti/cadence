@@ -15,12 +15,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +53,7 @@ fun ReaderScreen(state: ReaderState, onOpen: () -> Unit) {
                 state.docName == null -> EmptyState(onOpen)
                 !state.hasTextLayer -> ScannedMessage(onOpen)
                 else -> {
+                    state.resumeHint?.let { ResumeBanner(it) }
                     ReadingSurface(state, Modifier.weight(1f))
                     ControlRail(state)
                     TransportBar(state)
@@ -51,6 +62,38 @@ fun ReaderScreen(state: ReaderState, onOpen: () -> Unit) {
         }
         if (state.recallDue) RecallOverlay(onContinue = { state.continueRecall() })
     }
+}
+
+@Composable
+private fun ResumeBanner(text: String) {
+    Row(
+        Modifier.fillMaxWidth().background(CadenceColors.AccentSoft).padding(horizontal = 24.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("↻  $text", fontSize = 12.sp, color = CadenceColors.Accent, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun PageJump(state: ReaderState) {
+    var field by remember { mutableStateOf("") }
+    fun go() {
+        field.trim().toIntOrNull()?.let { state.jumpToPage(it) }
+        field = ""
+    }
+    Text("Page ${state.currentPage} / ${state.pageCount}", fontSize = 12.sp, color = CadenceColors.Muted)
+    Spacer(Modifier.width(8.dp))
+    OutlinedTextField(
+        value = field,
+        onValueChange = { v -> field = v.filter { it.isDigit() }.take(5) },
+        singleLine = true,
+        placeholder = { Text("Go to…", fontSize = 12.sp) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Go),
+        keyboardActions = KeyboardActions(onGo = { go() }),
+        modifier = Modifier.width(110.dp),
+    )
+    Spacer(Modifier.width(6.dp))
+    OutlinedButton(onClick = { go() }, enabled = field.isNotBlank()) { Text("Go") }
 }
 
 @Composable
@@ -65,6 +108,10 @@ private fun Header(state: ReaderState, onOpen: () -> Unit) {
             Text(it, fontSize = 13.sp, color = CadenceColors.Muted)
         }
         Spacer(Modifier.weight(1f))
+        if (state.docName != null && state.hasTextLayer && state.pageCount > 0) {
+            PageJump(state)
+            Spacer(Modifier.width(16.dp))
+        }
         if (state.docName != null) {
             Text("${(state.progress * 100).toInt()}%", fontSize = 13.sp, color = CadenceColors.Faint)
             Spacer(Modifier.width(12.dp))

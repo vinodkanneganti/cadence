@@ -22,17 +22,20 @@ actual class PdfExtractor actual constructor() {
             }
             collector.getText(doc) // drives writeString(...)
 
-            val lines = collector.lines.map { PdfLine(it.text, it.height.toDouble(), it.y.toDouble()) }
+            val lines = collector.lines.map { PdfLine(it.text, it.height.toDouble(), it.y.toDouble(), it.page) }
             val hasText = lines.any { it.text.isNotBlank() }
+            val built = if (hasText) PdfStructure.build(lines) else BuildResult(emptyList(), emptyList())
             ExtractResult(
-                units = if (hasText) PdfStructure.build(lines) else emptyList(),
+                units = built.units,
                 hasTextLayer = hasText,
+                pages = built.pages,
+                pageCount = doc.numberOfPages,
             )
         }
     }
 
     private class LineCollector : PDFTextStripper() {
-        data class RawLine(val text: String, val height: Float, val y: Float)
+        data class RawLine(val text: String, val height: Float, val y: Float, val page: Int)
 
         val lines = mutableListOf<RawLine>()
 
@@ -40,7 +43,7 @@ actual class PdfExtractor actual constructor() {
             if (text.isBlank()) return
             val height = textPositions.maxOfOrNull { it.fontSizeInPt } ?: 0f
             val y = textPositions.firstOrNull()?.yDirAdj ?: 0f
-            lines += RawLine(text.trim(), height, y)
+            lines += RawLine(text.trim(), height, y, currentPageNo)
         }
     }
 }

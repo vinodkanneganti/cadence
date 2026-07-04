@@ -66,6 +66,14 @@ class Player(
     fun next() = skipTo(index + 1)
     fun prev() = skipTo(index - 1)
 
+    /** Move the playhead to [target] without auto-playing (used by page-jump / resume). */
+    fun seekTo(target: Int) {
+        if (steps.isEmpty()) return
+        pause()
+        index = target.coerceIn(0, steps.size - 1)
+        onUnitStart(index)
+    }
+
     fun nextSection() {
         val target = (index + 1 until steps.size)
             .firstOrNull { steps[it].boundary == Boundary.SECTION }

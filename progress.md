@@ -196,3 +196,39 @@ Authenticated via the existing macOS keychain HTTPS credential (no `gh login` ne
 1. Golden-path pacing slope — keep the fast easy-sentence pace (literal formula) or soften the low-complexity slope?
 
 **Next (Phase 1, on go):** T4 `PdfExtractor` → T5 `RecallScheduler` → T6/T7 UI → Android/iOS `Speaker` actuals (needs Android SDK + AVSpeech rate mapping).
+
+---
+
+## Session 2 — 2026-07-04 — Voice selection in the demo
+
+The Phase 0 demo used macOS's default `say` voice (female, e.g. Samantha). Added a voice picker
+so the voice can be changed. This is R10 (voice controls) brought forward into the demo; the
+`Speaker` boundary already exposed `voices()` / `setVoice(id)`, so this was UI-only.
+
+**Changes (`App.kt`):**
+- Load installed voices on start via `speaker.voices()`, sorted English-first then by name.
+- Added a **Voice** dropdown (`DropdownMenu`) listing `name · locale`; selecting one calls
+  `speaker.setVoice(id)` so subsequent utterances use it.
+- Added a **Preview** button that speaks a short sample in the selected voice. Preview/selection
+  first call `player.pause()` so the player's in-flight utterance isn't orphaned by the preview's
+  internal `stop()` (avoids a hung coroutine).
+- Shows the installed-voice count.
+
+```bash
+./gradlew :shared:compileKotlinDesktop --console=plain   # BUILD SUCCESSFUL
+# smoke launch:
+./gradlew :shared:run --console=plain > /tmp/cadence_run2.log 2>&1 &
+grep -iE 'exception|caused by' /tmp/cadence_run2.log      # none
+pkill -f 'studio.sparkcube.cadence.MainKt'                # stopped
+```
+
+**Result:** app launches with the picker; no exceptions. 184 voices available on this Mac.
+
+**How to change the voice (for the user):** run `./gradlew :shared:run`, click the **Voice**
+button, pick a voice (e.g. *Alex · en_US* male, *Daniel · en_GB*), and it auto-previews. Press
+**Play** to hear the document in that voice. Note: on recent macOS many high-quality voices only
+appear after downloading them in **System Settings → Accessibility → Spoken Content → System
+Voice → Manage Voices**; once downloaded they show up in this list automatically.
+
+**Note / limitation:** the picker lists real installed voices only; there's no "reset to system
+default" item yet (would need a small `Speaker.clearVoice()` addition to the boundary). Deferred.

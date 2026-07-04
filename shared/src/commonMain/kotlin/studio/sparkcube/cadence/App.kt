@@ -2,6 +2,7 @@ package studio.sparkcube.cadence
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +45,7 @@ import studio.sparkcube.cadence.core.model.Unit as ReadUnit
 import studio.sparkcube.cadence.core.pacing.PacingEngine
 import studio.sparkcube.cadence.core.player.Player
 import studio.sparkcube.cadence.core.tts.Speaker
+import studio.sparkcube.cadence.core.tts.VoiceInfo
 
 /** Hardcoded sample document (Phase 0 gate: "a hardcoded sentence list reads aloud"). */
 private val SAMPLE = listOf(
@@ -73,13 +77,22 @@ fun App() {
         var section by remember { mutableStateOf(0) }
         var sayAvailable by remember { mutableStateOf(true) }
 
+        var voices by remember { mutableStateOf(emptyList<VoiceInfo>()) }
+        var selectedVoice by remember { mutableStateOf<VoiceInfo?>(null) }
+        var voiceMenuOpen by remember { mutableStateOf(false) }
+
         LaunchedEffect(Unit) {
             player.onUnitStart = { activeIndex = it }
             player.onSectionBoundary = { section = it }
             player.onFinished = { playing = false }
             player.onError = { playing = false }
             player.load(steps)
-            sayAvailable = speaker.voices().isNotEmpty()
+            val all = speaker.voices()
+            sayAvailable = all.isNotEmpty()
+            // Keep the list usable: English voices first, then everything else.
+            voices = all.sortedWith(
+                compareByDescending<VoiceInfo> { it.locale.startsWith("en") }.thenBy { it.name },
+            )
         }
 
         val focus = remember { FocusRequester() }
@@ -87,6 +100,20 @@ fun App() {
 
         fun sync() { playing = player.isPlaying }
         fun toggle() { player.toggle(); sync() }
+
+        // Speak a short sample in the current voice. Pauses playback first so the
+        // player's in-flight utterance isn't orphaned by the preview's `stop()`.
+        fun preview() {
+            player.pause(); playing = false
+            speaker.speak("This is the selected voice.", targetWpm = 160, onDone = {}, onError = {})
+        }
+
+        fun chooseVoice(v: VoiceInfo?) {
+            selectedVoice = v
+            v?.let { speaker.setVoice(it.id) }
+            voiceMenuOpen = false
+            if (!playing) preview()
+        }
 
         Column(
             Modifier
@@ -147,6 +174,32 @@ fun App() {
             }
 
             Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Voice", color = Muted, fontSize = 13.sp)
+                Spacer(Modifier.width(8.dp))
+                Box {
+                    Button(onClick = { voiceMenuOpen = true }, enabled = sayAvailable) {
+                        Text(selectedVoice?.let { "${it.name} · ${it.locale}" } ?: "Default (system)")
+                    }
+                    DropdownMenu(
+                        expanded = voiceMenuOpen,
+                        onDismissRequest = { voiceMenuOpen = false },
+                    ) {
+                        voices.forEach { v ->
+                            DropdownMenuItem(
+                                text = { Text("${v.name} · ${v.locale}") },
+                                onClick = { chooseVoice(v) },
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { preview() }, enabled = sayAvailable) { Text("Preview") }
+                Spacer(Modifier.width(16.dp))
+                Text("${voices.size} voices", color = Faint, fontSize = 12.sp)
+            }
+
+            Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = { player.prev(); sync() }) { Text("◀ Prev") }
                 Spacer(Modifier.width(8.dp))

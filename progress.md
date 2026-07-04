@@ -595,3 +595,17 @@ Reworked the UI toward a premium reader, inspired by reference screenshots (clea
 
 **Result:** cleaner reading-first UI + dark mode + adjustable typography, shared across desktop /
 Android / iOS. Verified on desktop; Android APK built (reinstall when the phone reconnects).
+
+### On-device tuning (Galaxy S24 Ultra)
+- Reinstalled + screenshotted the polished build — looks clean (serif reading, amber active line,
+  blue Play, Aa/☆ popovers).
+- **Safe-area insets:** app was edge-to-edge, drawing under the status bar and system nav bar.
+  Padded content by `WindowInsets.systemBars` (paper still fills behind bars) and popovers by
+  `safeDrawing`. Status bar now clears the top bar.
+- **Bottom bar:** per user request, lifted the transport clear of the device nav bar — hairline
+  divider above it + larger bottom padding.
+
+**Known quirk (flagged, not yet fixed):** on chapter-title pages where each word sits on its own PDF
+line, the "short line without terminal punctuation → SECTION" heuristic tags each word as a giant
+heading (and inflates the section count → false recall triggers). Fix ideas: require a heading to be
+followed by body text, merge consecutive heading-ish lines, and/or cap heading font size.
